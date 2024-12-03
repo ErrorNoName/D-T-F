@@ -94,7 +94,7 @@ def main():
 
     # Boîte d'attente avec bouton simulé
     start_prompt = Panel(
-        Align.center(Text("Appuyez sur [bold green][Entrée][/bold green] pour démarrer la génération et la vérification des tokens !", justify="center"), vertical="middle"),
+        Align.center(Text("Appuyez sur [Entrée] pour démarrer la génération et la vérification des tokens !", justify="center"), vertical="middle"),
         style="bold blue",
         expand=False,
     )
