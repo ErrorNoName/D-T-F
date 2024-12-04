@@ -104,7 +104,7 @@ def main():
     # Initialisation des listes pour les résultats
     valid_tokens = []
     invalid_tokens = []
-    total_tokens = 9000  # Nombre total de tokens à générer
+    total_tokens = 99999  # Nombre total de tokens à générer
 
     # Création des tables pour les tokens valides et invalides
     table_valid = Table(title="Tokens Valides", show_header=True, header_style="bold green")
@@ -139,7 +139,7 @@ def main():
 
     # Footer avec le compteur
     footer_panel = Panel(
-        Align.center(Text("Tokens générés : 0/9000 | Valides : 0 | Invalides : 0", justify="center"), vertical="middle"),
+        Align.center(Text("Tokens générés : 0/99999 | Valides : 0 | Invalides : 0", justify="center"), vertical="middle"),
         style="bold yellow"
     )
     layout["footer"].update(footer_panel)
